@@ -2,7 +2,8 @@ import opensim
 import math
 import numpy as np
 import os
-from .utils.mygym import convert_to_gym
+#from .utils.mygym import convert_to_gym
+from osim.env.utils.mygym import convert_to_gym
 import gym
 
 class Osim(object):
@@ -143,7 +144,7 @@ class OsimEnv(gym.Env):
         pass
 
 
-        super(OsimEnv, self).reset()
+        #super(OsimEnv, self).reset()
         self.istep = 0
         self.osim_model.initializeState()
         return self.get_observation()

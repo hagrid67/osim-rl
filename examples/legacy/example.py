@@ -16,6 +16,9 @@ from rl.random import OrnsteinUhlenbeckProcess
 from osim.env import *
 from osim.http.client import Client
 
+#from osim.env.legacy.run import RunEnv
+from osim.env.osim import ProstheticsEnv
+
 from keras.optimizers import RMSprop
 
 import argparse
@@ -32,7 +35,9 @@ parser.add_argument('--token', dest='token', action='store', required=False)
 args = parser.parse_args()
 
 # Load walking environment
-env = RunEnv(args.visualize)
+# env = RunEnv(args.visualize)
+env = ProstheticsEnv(args.visualize)
+
 env.reset()
 
 nb_actions = env.action_space.shape[0]
@@ -71,7 +76,10 @@ print(critic.summary())
 
 # Set up the agent for training
 memory = SequentialMemory(limit=100000, window_length=1)
-random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.2, size=env.noutput)
+print(env.__dict__.keys())
+print(env.action_space.shape)
+nMusc = env.action_space.shape[0]
+random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.2, size=nMusc)
 agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
                   memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100,
                   random_process=random_process, gamma=.99, target_model_update=1e-3,
@@ -85,7 +93,8 @@ agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
 if args.train:
-    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=10000)
+    #agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.timestep_limit, log_interval=10000)
+    agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.spec.timestep_limit, log_interval=10000)
     # After training is done, we save the final weights.
     agent.save_weights(args.model, overwrite=True)
 
