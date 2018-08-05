@@ -99,6 +99,8 @@ class OsimModel(object):
         brain = opensim.PrescribedController.safeDownCast(self.model.getControllerSet().get(0))
         functionSet = brain.get_ControlFunctions()
 
+        #print("functionSet size:", functionSet.getSize(), len(action))
+
         for j in range(functionSet.getSize()):
             func = opensim.Constant.safeDownCast(functionSet.get(j))
             func.setValue( float(action[j]) )
@@ -407,7 +409,7 @@ class ProstheticsEnv(OsimEnv):
 
     time_limit = 300
 
-    def __init__(self, visualize = True, integrator_accuracy = 5e-5):
+    def __init__(self, visualize = False, integrator_accuracy = 5e-5):
         self.model_paths = {}
         self.model_paths["3D_pros"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_pros_20180507.osim')    
         self.model_paths["3D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_20170320.osim')    
@@ -472,7 +474,9 @@ class ProstheticsEnv(OsimEnv):
         cm_pos = [state_desc["misc"]["mass_center_pos"][i] - pelvis[i] for i in range(2)]
         res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
 
-        return res
+        #print("Prosthetics get_observation res: ", type(res), len(res))
+        # return res # jw
+        return np.array(res)
 
     def get_observation_space_size(self):
         if self.prosthetic == True:

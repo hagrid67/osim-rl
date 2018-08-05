@@ -12,7 +12,9 @@ from rl.agents import DDPGAgent
 from rl.memory import SequentialMemory
 from rl.random import OrnsteinUhlenbeckProcess
 
-from osim.env import *
+#from osim.env import *
+from osim.env import ProstheticsEnv
+
 from osim.http.client import Client
 
 from keras.optimizers import RMSprop
@@ -23,6 +25,7 @@ import math
 # Command line parameters
 parser = argparse.ArgumentParser(description='Train or test neural net motor controller')
 parser.add_argument('--train', dest='train', action='store_true', default=True)
+parser.add_argument('--load', dest='bLoad', action='store_true', default=False)
 parser.add_argument('--test', dest='train', action='store_false', default=True)
 parser.add_argument('--steps', dest='steps', action='store', default=100000, type=int)
 parser.add_argument('--visualize', dest='visualize', action='store_true', default=False)
@@ -31,13 +34,26 @@ parser.add_argument('--token', dest='token', action='store', required=False)
 args = parser.parse_args()
 
 # Load walking environment
-env = Arm2DEnv(args.visualize)
-env.reset()
+#env = Arm2DEnv(args.visualize)
+env = ProstheticsEnv(visualize=args.visualize)
+print("Changing Env...")
+env.change_model(model='3D', prosthetic=False, difficulty=2, seed=None)
+tFromReset = env.reset()
+print ("From Reset:", len(tFromReset), type(tFromReset[0]))
 
 nb_actions = env.action_space.shape[0]
 
 # Total number of steps in training
 nallsteps = args.steps
+
+print("Obs Space:", env.observation_space.shape)
+
+# jw
+print("Calling step")
+observation, reward, done, info = env.step(np.zeros(nb_actions), project=False)
+print(type(env), env)
+print("obs:", type(observation), len(observation), observation)
+
 
 # Create networks for DDPG
 # Next, we build a very simple model.
@@ -56,6 +72,7 @@ print(actor.summary())
 action_input = Input(shape=(nb_actions,), name='action_input')
 observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
 flattened_observation = Flatten()(observation_input)
+print("flattened_observation:", type(flattened_observation),  flattened_observation.shape)
 x = concatenate([action_input, flattened_observation])
 x = Dense(64)(x)
 x = Activation('relu')(x)
@@ -84,6 +101,8 @@ agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
 if args.train:
+    if args.bLoad:
+        agent.load_weights(args.model)
     agent.fit(env, nb_steps=nallsteps, visualize=False, verbose=1, nb_max_episode_steps=env.time_limit, log_interval=10000)
     # After training is done, we save the final weights.
     agent.save_weights(args.model, overwrite=True)
