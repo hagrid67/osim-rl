@@ -9,3 +9,5 @@ build/
 _site
 *.lock
 .sass-cache
+*.h5f
+*-saf
