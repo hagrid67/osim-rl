@@ -58,7 +58,8 @@ class Client(object):
             sys.exit(e.message)
         self.instance_id = resp['instance_id']
         self.env_monitor_start("tmp", force=True)
-        return self.env_reset()
+        #return self.env_reset()
+        
 
     def env_reset(self):
         route = '/v1/envs/{}/reset/'.format(self.instance_id)
