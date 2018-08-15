@@ -39,9 +39,13 @@ class OsimModel(object):
 
     def __init__(self, model_path, visualize, integrator_accuracy = 5e-5):
         self.integrator_accuracy = integrator_accuracy
-        self.model = opensim.Model(model_path)
+        #print("osim 1")
+        self.model = opensim.Model(model_path) # annoying warning happens here
+        #print("osim 2")
         self.model.initSystem()
+        #print("osim 3")
         self.brain = opensim.PrescribedController()
+        #print("osim 3")
 
         # Enable the visualizer
         self.model.setUseVisualizer(visualize)
