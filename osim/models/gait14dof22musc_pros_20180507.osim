@@ -1504,7 +1504,7 @@
 					<inertia_xz>0</inertia_xz>
 					<inertia_yz>0</inertia_yz>
 					<Joint>
-						<WeldJoint name="back">
+						<WeldJoint name="back_0">
 							<!--Name of the parent body to which this joint connects its owner body.-->
 							<parent_body>torso</parent_body>
 							<!--Location of the joint in the parent body specified in the parent reference frame. Default is (0,0,0).-->
@@ -2954,7 +2954,7 @@
 					<!--Damping constant.-->
 					<viscosity>1.0</viscosity>
 				</SpringGeneralizedForce>
-				<HuntCrossleyForce name="pros_foot_r">
+				<HuntCrossleyForce name="pros_foot_r_0">
 					<!--Flag indicating whether the force is disabled or not. Disabled means that the force is not active in subsequent dynamics realizations.-->
 					<isDisabled>false</isDisabled>
 					<!--Material properties.-->
