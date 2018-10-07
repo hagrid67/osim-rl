@@ -488,12 +488,18 @@ class ProstheticsEnv(OsimEnv):
 
         cm_pos = [state_desc["misc"]["mass_center_pos"][i] - pelvis[i] for i in range(2)]
         res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
+        # jw add target vel
+        #d["target_vel"] = self.targets[self.osim_model.istep,:].tolist()
+        #print(len(res))
 
+        # Add the target vel x and z coords to the observation list
+        res += [ state_desc["target_vel"][i] for i in [0,2] ]
         return res
 
     def get_observation_space_size(self):
         if self.prosthetic == True:
-            return 160
+            # return 160
+            return 162 # added target_vel x,z
         return 169
 
     def generate_new_targets(self, poisson_lambda = 300):
@@ -517,6 +523,7 @@ class ProstheticsEnv(OsimEnv):
 
         trajectory_polar = np.vstack((velocity,heading)).transpose()
         self.targets = np.apply_along_axis(rect, 1, trajectory_polar)
+        #print (self.targets)
         
     def get_state_desc(self):
         d = super(ProstheticsEnv, self).get_state_desc()

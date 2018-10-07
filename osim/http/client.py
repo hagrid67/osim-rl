@@ -19,6 +19,7 @@ class Client(object):
         self.session = requests.Session()
         self.session.headers.update({'Content-type': 'application/json'})
         self.instance_id = None
+        print ("client init")
 
     def _parse_server_error_or_raise_for_status(self, resp):
         j = {}
@@ -37,6 +38,7 @@ class Client(object):
     def _post_request(self, route, data):
         url = urlparse.urljoin(self.remote_base, route)
         logger.info("POST {}\n{}".format(url, json.dumps(data)))
+        #print("POST {}\n{}".format(url, json.dumps(data)))
         resp = self.session.post(urlparse.urljoin(self.remote_base, route),
                             data=json.dumps(data))
         return self._parse_server_error_or_raise_for_status(resp)
@@ -48,12 +50,15 @@ class Client(object):
         return self._parse_server_error_or_raise_for_status(resp)
 
     def env_create(self, token, env_id = "Run"):
+        print("env_create")
         route = '/v1/envs/'
         data = {'env_id': env_id,
                 'token': token,
                 'version': pkg_resources.get_distribution("osim-rl").version }
         try:
+            #print("call _post")
             resp = self._post_request(route, data)
+            #print("done")
         except ServerError as e:
             sys.exit(e.message)
         self.instance_id = resp['instance_id']
