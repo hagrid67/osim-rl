@@ -37,7 +37,7 @@ class Client(object):
 
     def _post_request(self, route, data):
         url = urlparse.urljoin(self.remote_base, route)
-        logger.info("POST {}\n{}".format(url, json.dumps(data)))
+        #logger.info("POST {}\n{}".format(url, json.dumps(data)))
         #print("POST {}\n{}".format(url, json.dumps(data)))
         resp = self.session.post(urlparse.urljoin(self.remote_base, route),
                             data=json.dumps(data))
