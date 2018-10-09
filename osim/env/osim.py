@@ -468,12 +468,14 @@ class ProstheticsEnv(OsimEnv):
             cur += state_desc["body_vel_rot"][body_part][2:]
             cur += state_desc["body_acc_rot"][body_part][2:]
             if body_part == "pelvis":
-                pelvis = cur
-                res += cur[1:]
+                pelvis = cur  # save the pelvis coords - pos, vel, acc, etc
+                res += cur[1:] # leave out the x position of the pelvis... dumb with target vel now vector?
+                # should we subtract both x and z?
+                # and leave out x and z position of pelvis?
             else:
-                cur_upd = cur
-                cur_upd[:2] = [cur[i] - pelvis[i] for i in range(2)]
-                cur_upd[6:7] = [cur[i] - pelvis[i] for i in range(6,7)]
+                cur_upd = cur # copy the refence to cur...
+                cur_upd[:2] = [cur[i] - pelvis[i] for i in range(2)] # subtract the pelvis x,y?
+                cur_upd[6:7] = [cur[i] - pelvis[i] for i in range(6,7)] # just affects item 6 - body_pos_rot x?
                 res += cur
 
         for joint in ["ankle_l","ankle_r","back","hip_l","hip_r","knee_l","knee_r"]:
