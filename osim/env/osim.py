@@ -420,7 +420,13 @@ class ProstheticsEnv(OsimEnv):
             self.time_limit = 1000
         self.spec.timestep_limit = self.time_limit    
 
-    def __init__(self, visualize = True, integrator_accuracy = 5e-5, difficulty=0, seed=0):
+    def __init__(self,
+            visualize = True, 
+            integrator_accuracy = 5e-5,
+            difficulty=0,
+            seed=0,
+            dEnvConfig={},
+            ):
         self.model_paths = {}
         self.model_paths["3D_pros"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_pros_20180507.osim')    
         self.model_paths["3D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_20170320.osim')    
@@ -429,6 +435,10 @@ class ProstheticsEnv(OsimEnv):
         self.model_path = self.model_paths[self.get_model_key()]
         super(ProstheticsEnv, self).__init__(visualize = visualize, integrator_accuracy = integrator_accuracy)
         self.set_difficulty(difficulty)
+
+        self.dConfigDefault = dict(rBaseReward=10)
+        self.dConfig = {**(self.dConfigDefault), **dEnvConfig}
+        self.rBaseReward = self.dConfig["rBaseReward"]
         random.seed(seed)
 
     def change_model(self, model='3D', prosthetic=True, difficulty=0, seed=0):
@@ -558,7 +568,8 @@ class ProstheticsEnv(OsimEnv):
         penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
         
         # Reward for not falling
-        reward = 10.0
+        #reward = 10.0
+        reward = self.rBaseReward
         
         return reward - penalty 
 
