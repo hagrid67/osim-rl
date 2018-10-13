@@ -436,9 +436,13 @@ class ProstheticsEnv(OsimEnv):
         super(ProstheticsEnv, self).__init__(visualize = visualize, integrator_accuracy = integrator_accuracy)
         self.set_difficulty(difficulty)
 
-        self.dConfigDefault = dict(rBaseReward=10)
-        self.dConfig = {**(self.dConfigDefault), **dEnvConfig}
+        self.dConfigDefault = dict(
+            rBaseReward = 10.,
+            rPenPelvisRot = 0.,
+            )
+        self.dConfig = {**(self.dConfigDefault), **dEnvConfig} # overwrite default with dEnvConfig
         self.rBaseReward = self.dConfig["rBaseReward"]
+        
         random.seed(seed)
 
     def change_model(self, model='3D', prosthetic=True, difficulty=0, seed=0):
@@ -567,6 +571,11 @@ class ProstheticsEnv(OsimEnv):
         penalty += (state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**2
         penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
         
+        gPelvRot = np.array(state_desc["body_pos_rot"]["pelvis"])
+        rPelvRot = np.sum(gPelvRot ** 2)
+        penalty += self.dConfig["rPenPelvisRot"] * rPelvRot
+
+
         # Reward for not falling
         #reward = 10.0
         reward = self.rBaseReward
