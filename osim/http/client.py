@@ -29,6 +29,8 @@ class Client(object):
             # Most likely json parse failed because of network error, not server error (server
             # sends its errors in json). Don't let parse exception go up, but rather raise default
             # error.
+            print(resp) #jw 
+            print(resp.content) #jw
             resp.raise_for_status()
         if resp.status_code != 200 and "message" in j:  # descriptive message from server side
             raise ServerError(message=j["message"], status_code=resp.status_code)

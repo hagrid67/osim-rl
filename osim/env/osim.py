@@ -414,11 +414,15 @@ class ProstheticsEnv(OsimEnv):
 
     def set_difficulty(self, difficulty):
         self.difficulty = difficulty
-        if difficulty == 0:
-            self.time_limit = 300
-        if difficulty == 1:
-            self.time_limit = 1000
-        self.spec.timestep_limit = self.time_limit    
+        
+        #if difficulty == 0:
+        #    self.time_limit = 300
+        #if difficulty == 1:
+        #    self.time_limit = 1000
+
+        # jw set timestep_limit from dConfig
+        self.time_limit = self.spec.timestep_limit = self.dConfig["timestep_limit"]
+        #self.spec.timestep_limit = self.time_limit    
 
     def __init__(self,
             visualize = True, 
@@ -427,6 +431,25 @@ class ProstheticsEnv(OsimEnv):
             seed=0,
             dEnvConfig={},
             ):
+
+
+        # default values to be overridden by runner in dEnvConfig
+        self.dConfigDefault = dict(
+            visualize = None, # ie use function arg unless overridden
+            rBaseReward = 10.,
+            rPenPelvisRot = 0.,
+            rPenHipAdd = 0.,
+            timestep_limit = 1000,
+            debug = False,
+
+            )
+        self.dConfig = {**(self.dConfigDefault), **dEnvConfig} # overwrite default with dEnvConfig
+        self.rBaseReward = self.dConfig["rBaseReward"]
+
+        if "visualize" in self.dConfig: # override the function arg if set in dConfig
+            visualize = self.dConfig["visualize"]
+
+
         self.model_paths = {}
         self.model_paths["3D_pros"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_pros_20180507.osim')    
         self.model_paths["3D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_20170320.osim')    
@@ -434,14 +457,11 @@ class ProstheticsEnv(OsimEnv):
         self.model_paths["2D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_planar_20170320.osim')
         self.model_path = self.model_paths[self.get_model_key()]
         super(ProstheticsEnv, self).__init__(visualize = visualize, integrator_accuracy = integrator_accuracy)
+        
         self.set_difficulty(difficulty)
+        
 
-        self.dConfigDefault = dict(
-            rBaseReward = 10.,
-            rPenPelvisRot = 0.,
-            )
-        self.dConfig = {**(self.dConfigDefault), **dEnvConfig} # overwrite default with dEnvConfig
-        self.rBaseReward = self.dConfig["rBaseReward"]
+        
         
         random.seed(seed)
 
@@ -571,9 +591,25 @@ class ProstheticsEnv(OsimEnv):
         penalty += (state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**2
         penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
         
+        # jw reward shaping
+        # penalty for rotating the pelvis (to encourage "normal" walking)
         gPelvRot = np.array(state_desc["body_pos_rot"]["pelvis"])
         rPelvRot = np.sum(gPelvRot ** 2)
         penalty += self.dConfig["rPenPelvisRot"] * rPelvRot
+
+        # Hip Adduction: >0 means leg pulled inwards.
+        rHipAdd_l = state_desc["joint_pos"]["hip_l"][1]
+        rHipAdd_r = state_desc["joint_pos"]["hip_r"][1]
+        
+        rHipAdd_l = (np.sign(rHipAdd_l) > 0) * rHipAdd_l # ie positive part: zero if negative, 
+        rHipAdd_r = (np.sign(rHipAdd_r) > 0) * rHipAdd_r
+
+        rPenHipAdd = self.dConfig["rPenHipAdd"] * (rHipAdd_l**2 + rHipAdd_r**2)
+
+        if self.dConfig["debug"]:
+            print("rPenHipAdd:", rPenHipAdd, rHipAdd_l, rHipAdd_r, "rPelvRot:", rPelvRot)
+
+        penalty += rPenHipAdd
 
 
         # Reward for not falling
