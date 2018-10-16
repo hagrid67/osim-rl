@@ -604,7 +604,7 @@ class ProstheticsEnv(OsimEnv):
         rHipAdd_l = (np.sign(rHipAdd_l) > 0) * rHipAdd_l # ie positive part: zero if negative, 
         rHipAdd_r = (np.sign(rHipAdd_r) > 0) * rHipAdd_r
 
-        rPenHipAdd = self.dConfig["rPenHipAdd"] * (rHipAdd_l**2 + rHipAdd_r**2)
+        rPenHipAdd = self.dConfig["rPenHipAdd"] * ((rHipAdd_l + rHipAdd_r) **2)
 
         if self.dConfig["debug"]:
             print("rPenHipAdd:", rPenHipAdd, rHipAdd_l, rHipAdd_r, "rPelvRot:", rPelvRot)
