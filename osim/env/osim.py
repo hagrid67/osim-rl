@@ -44,7 +44,7 @@ class OsimModel(object):
         self.brain = opensim.PrescribedController()
 
         # Enable the visualizer
-        self.model.setUseVisualizer(visualize)
+        self.model.setUseVisualizer(bool(visualize))
 
         self.muscleSet = self.model.getMuscles()
         self.forceSet = self.model.getForceSet()
@@ -439,6 +439,9 @@ class ProstheticsEnv(OsimEnv):
             rBaseReward = 10.,
             rPenPelvisRot = 0.,
             rPenHipAdd = 0.,
+            rHipAddThresh = 0.,
+            rPenKneeStraight = 0.,
+            rKneeThresh = 0.,
             timestep_limit = 1000,
             debug = False,
 
@@ -446,7 +449,8 @@ class ProstheticsEnv(OsimEnv):
         self.dConfig = {**(self.dConfigDefault), **dEnvConfig} # overwrite default with dEnvConfig
         self.rBaseReward = self.dConfig["rBaseReward"]
 
-        if "visualize" in self.dConfig: # override the function arg if set in dConfig
+        # override the function arg if set in dConfig
+        if ("visualize" in self.dConfig) and (self.dConfig["visualize"] is not None):
             visualize = self.dConfig["visualize"]
 
 
@@ -588,8 +592,11 @@ class ProstheticsEnv(OsimEnv):
 
         # Big penalty for not matching the vector on the X,Z projection.
         # No penalty for the vertical axis
-        penalty += (state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**2
-        penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
+        #penalty += (state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**2
+        #penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
+        
+        rPenVx = abs(state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**1
+        rPenVz = abs(state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**1
         
         # jw reward shaping
         # penalty for rotating the pelvis (to encourage "normal" walking)
@@ -598,18 +605,34 @@ class ProstheticsEnv(OsimEnv):
         penalty += self.dConfig["rPenPelvisRot"] * rPelvRot
 
         # Hip Adduction: >0 means leg pulled inwards.
-        rHipAdd_l = state_desc["joint_pos"]["hip_l"][1]
-        rHipAdd_r = state_desc["joint_pos"]["hip_r"][1]
-        
-        rHipAdd_l = (np.sign(rHipAdd_l) > 0) * rHipAdd_l # ie positive part: zero if negative, 
-        rHipAdd_r = (np.sign(rHipAdd_r) > 0) * rHipAdd_r
+        rHipAdd_l = state_desc["joint_pos"]["hip_l"][1] - self.dConfig["rHipAddThresh"]
+        rHipAdd_r = state_desc["joint_pos"]["hip_r"][1] - self.dConfig["rHipAddThresh"]
 
-        rPenHipAdd = self.dConfig["rPenHipAdd"] * ((rHipAdd_l + rHipAdd_r) **2)
+        rHipAdd_l *= (np.sign(rHipAdd_l) > 0)  # ie positive part: zero if negative, 
+        rHipAdd_r *= (np.sign(rHipAdd_r) > 0) 
+
+        rPenHipAdd = self.dConfig["rPenHipAdd"] * ((rHipAdd_l + rHipAdd_r) ** 1)
+
+        rKnee_l = state_desc["joint_pos"]["knee_l"][0] - self.dConfig["rKneeThresh"]
+        rKnee_r = state_desc["joint_pos"]["knee_r"][0] - self.dConfig["rKneeThresh"]
+
+        rKnee_l *= (np.sign(rKnee_l) > 0)
+        rKnee_r *= (np.sign(rKnee_r) > 0)
+
+        rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1)
+
+        def floatstr(*lrVal):
+            return " ".join(["{:.2f}".format(rVal) for rVal in lrVal])
 
         if self.dConfig["debug"]:
-            print("rPenHipAdd:", rPenHipAdd, rHipAdd_l, rHipAdd_r, "rPelvRot:", rPelvRot)
+            print(
+                "PenV:", floatstr(rPenVx, rPenVz),
+                "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
+                "Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
+                "PelvRot:", floatstr(rPelvRot),
+                )
 
-        penalty += rPenHipAdd
+        penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight
 
 
         # Reward for not falling
