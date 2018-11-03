@@ -442,8 +442,11 @@ class ProstheticsEnv(OsimEnv):
             rHipAddThresh = 0.,
             rPenKneeStraight = 0.,
             rKneeThresh = 0.,
+            rPenPower = 2., # only applied to velocity penalty.
             timestep_limit = 1000,
             debug = False,
+            sfOsim = None,
+            
 
             )
         self.dConfig = {**(self.dConfigDefault), **dEnvConfig} # overwrite default with dEnvConfig
@@ -459,7 +462,12 @@ class ProstheticsEnv(OsimEnv):
         self.model_paths["3D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_20170320.osim')    
         self.model_paths["2D_pros"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_planar_pros_20180507.osim')    
         self.model_paths["2D"] = os.path.join(os.path.dirname(__file__), '../models/gait14dof22musc_planar_20170320.osim')
-        self.model_path = self.model_paths[self.get_model_key()]
+
+        if self.dConfig["sfOsim"] is not None:
+            self.model_path = os.path.join(os.path.dirname(__file__), "../models/" + self.dConfig["sfOsim"])
+        else:
+            self.model_path = self.model_paths[self.get_model_key()]
+
         super(ProstheticsEnv, self).__init__(visualize = visualize, integrator_accuracy = integrator_accuracy)
         
         self.set_difficulty(difficulty)
@@ -586,6 +594,7 @@ class ProstheticsEnv(OsimEnv):
         state_desc = self.get_state_desc()
         prev_state_desc = self.get_prev_state_desc()
         penalty = 0
+        rPenPower = self.dConfig["rPenPower"]
 
         # Small penalty for too much activation (cost of transport)
         penalty += np.sum(np.array(self.osim_model.get_activations())**2) * 0.001
@@ -595,13 +604,13 @@ class ProstheticsEnv(OsimEnv):
         #penalty += (state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**2
         #penalty += (state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**2
         
-        rPenVx = abs(state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**1
-        rPenVz = abs(state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**1
+        rPenVx = abs(state_desc["body_vel"]["pelvis"][0] - state_desc["target_vel"][0])**rPenPower
+        rPenVz = abs(state_desc["body_vel"]["pelvis"][2] - state_desc["target_vel"][2])**rPenPower
         
         # jw reward shaping
         # penalty for rotating the pelvis (to encourage "normal" walking)
         gPelvRot = np.array(state_desc["body_pos_rot"]["pelvis"])
-        rPelvRot = np.sum(gPelvRot ** 2)
+        rPelvRot = np.sum(gPelvRot ** 2) # leave rPenPower out here.
         penalty += self.dConfig["rPenPelvisRot"] * rPelvRot
 
         # Hip Adduction: >0 means leg pulled inwards.
@@ -611,7 +620,7 @@ class ProstheticsEnv(OsimEnv):
         rHipAdd_l *= (np.sign(rHipAdd_l) > 0)  # ie positive part: zero if negative, 
         rHipAdd_r *= (np.sign(rHipAdd_r) > 0) 
 
-        rPenHipAdd = self.dConfig["rPenHipAdd"] * ((rHipAdd_l + rHipAdd_r) ** 1)
+        rPenHipAdd = self.dConfig["rPenHipAdd"] * ((rHipAdd_l + rHipAdd_r) ** 1) # not rPenPower
 
         rKnee_l = state_desc["joint_pos"]["knee_l"][0] - self.dConfig["rKneeThresh"]
         rKnee_r = state_desc["joint_pos"]["knee_r"][0] - self.dConfig["rKneeThresh"]
@@ -619,20 +628,21 @@ class ProstheticsEnv(OsimEnv):
         rKnee_l *= (np.sign(rKnee_l) > 0)
         rKnee_r *= (np.sign(rKnee_r) > 0)
 
-        rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1)
+        rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1) # not rPenPower
 
         def floatstr(*lrVal):
             return " ".join(["{:.2f}".format(rVal) for rVal in lrVal])
 
+        penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight
+
         if self.dConfig["debug"]:
             print(
+                "Pen:", floatstr(penalty),
                 "PenV:", floatstr(rPenVx, rPenVz),
                 "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
                 "Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
                 "PelvRot:", floatstr(rPelvRot),
                 )
-
-        penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight
 
 
         # Reward for not falling
