@@ -5,6 +5,7 @@ from .utils.mygym import convert_to_gym
 import gym
 import opensim
 import random
+import pandas as pd
 
 ## OpenSim interface
 # The amin purpose of this class is to provide wrap all 
@@ -472,10 +473,10 @@ class ProstheticsEnv(OsimEnv):
         
         self.set_difficulty(difficulty)
         
-
-        
-        
         random.seed(seed)
+
+        #self.dfInput = pd.read_csv("../input-data/1.25.csv")
+        #dfInput 
 
     def change_model(self, model='3D', prosthetic=True, difficulty=0, seed=0):
         if (self.model, self.prosthetic) != (model, prosthetic):
