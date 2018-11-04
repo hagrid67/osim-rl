@@ -7,8 +7,12 @@ import opensim
 import random
 import pandas as pd
 
+def floatstr(*lrVal):
+    return " ".join(["{:.2f}".format(float(rVal)) for rVal in lrVal])
+
+
 ## OpenSim interface
-# The amin purpose of this class is to provide wrap all 
+# The main purpose of this class is to wrap all 
 # the necessery elements of OpenSim in one place
 # The actual RL environment then only needs to:
 # - open a model
@@ -72,6 +76,8 @@ class OsimModel(object):
             
         self.model.addController(self.brain)
         self.model.initSystem()
+
+        self.dfKin = pd.read_csv("./input-data/1.25.csv")
 
     def list_elements(self):
         print("JOINTS")
@@ -236,10 +242,20 @@ class OsimModel(object):
     def reset(self):
         self.state = self.model.initializeState()
         self.model.equilibrateMuscles(self.state)
-        self.state.setTime(0)
-        self.istep = 0
 
+        self.istep = self.start_point =  0
+        self.istep = self.start_point =  np.random.randint(0,100)#10/11 for jrf plots, 50/51 for video
+        init_states = self.dfKin.iloc[self.istep,2:].values
+        vec = opensim.Vector(init_states)
+        self.model.setStateVariableValues(self.state, vec)
+
+        self.state.setTime(self.istep*self.stepsize)
         self.reset_manager()
+        
+        #self.state.setTime(0)
+        #self.istep = 0
+
+        #self.reset_manager()
 
     def get_state(self):
         return opensim.State(self.state)
@@ -474,9 +490,10 @@ class ProstheticsEnv(OsimEnv):
         self.set_difficulty(difficulty)
         
         random.seed(seed)
+        self.dfKin = self.osim_model.dfKin
+        
 
-        #self.dfInput = pd.read_csv("../input-data/1.25.csv")
-        #dfInput 
+
 
     def change_model(self, model='3D', prosthetic=True, difficulty=0, seed=0):
         if (self.model, self.prosthetic) != (model, prosthetic):
@@ -584,6 +601,22 @@ class ProstheticsEnv(OsimEnv):
         self.generate_new_targets()
         return super(ProstheticsEnv, self).reset(project = project)
 
+        #self.iStart = max(0, np.random.randint(low=-60, high=100))
+        #self.state = self.osim_model.model.initializeState()
+        #self.istep = self.start_point =  0
+        #self.istep = self.start_point =  self.iStart # np.random.randint(0,100)#10/11 for jrf plots, 50/51 for video
+        #gState = self.dfKin.iloc[self.istep,2:].values
+        #oVecState = opensim.Vector(gState)
+        #self.osim_model.model.setStateVariableValues(self.state, oVecState)
+
+        #self.osim_model.state.setTime(self.istep*self.stepsize)
+        #self.reset_manager()
+
+
+        #speed_reward = np.exp(-0.1*total_speed_loss)
+        # pos_reward = np.exp(-2* total_position_loss)
+
+
     def reward_round1(self):
         state_desc = self.get_state_desc()
         prev_state_desc = self.get_prev_state_desc()
@@ -631,24 +664,61 @@ class ProstheticsEnv(OsimEnv):
 
         rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1) # not rPenPower
 
-        def floatstr(*lrVal):
-            return " ".join(["{:.2f}".format(rVal) for rVal in lrVal])
+
+        dfKin = self.osim_model.dfKin
+        t = self.osim_model.istep
+
+        ankle_loss = (state_desc['joint_pos']['ankle_l'] - dfKin['ankle_angle_l'][t])**2
+
+        knee_loss = (state_desc['joint_pos']['knee_l'] - dfKin['knee_angle_l'][t])**2 + \
+                    (state_desc['joint_pos']['knee_r'] - dfKin['knee_angle_r'][t])**2
+
+        hip_loss =  (state_desc['joint_pos']['hip_l'][0] - dfKin['hip_flexion_l'][t])**2 +      \
+                    (state_desc['joint_pos']['hip_r'][0] - dfKin['hip_flexion_r'][t])**2 +      \
+                    (state_desc['joint_pos']['hip_l'][1] - dfKin['hip_adduction_l'][t])**2 +    \
+                    (state_desc['joint_pos']['hip_r'][1] - dfKin['hip_adduction_r'][t])**2
+
+
+        ankle_loss_v = (state_desc['joint_vel']['ankle_l'] - dfKin['ankle_angle_l_speed'][t])**2 
+                    #+ (state_desc['joint_vel']['ankle_r'] - dfKin['ankle_angle_r_speed'][t])**2
+        
+        knee_loss_v = (state_desc['joint_vel']['knee_l'] - dfKin['knee_angle_l_speed'][t])**2 +     \
+                     (state_desc['joint_vel']['knee_r'] - dfKin['knee_angle_r_speed'][t])**2
+
+        hip_loss_v = (state_desc['joint_vel']['hip_l'][0] - dfKin['hip_flexion_l_speed'][t])**2 +   \
+                     (state_desc['joint_vel']['hip_r'][0] - dfKin['hip_flexion_r_speed'][t])**2 +   \
+                     (state_desc['joint_vel']['hip_l'][1] - dfKin['hip_adduction_l_speed'][t])**2 + \
+                     (state_desc['joint_vel']['hip_r'][1] - dfKin['hip_adduction_r_speed'][t])**2
+
+        rLossPos = ankle_loss + knee_loss + hip_loss
+        rLossVel = ankle_loss_v + knee_loss_v + hip_loss_v
+
+        rRewStatePos = np.exp(-self.dConfig["rPenStateLoc"] * rLossPos)
+        rRewStateVel = np.exp(-self.dConfig["rPenStateVel"] * rLossVel)
+
+        #print(rRewStatePos, rRewStateVel, type(rRewStatePos), type(rRewStateVel))
+
 
         penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight
 
+
+
         if self.dConfig["debug"]:
             print(
+                t,
                 "Pen:", floatstr(penalty),
                 "PenV:", floatstr(rPenVx, rPenVz),
                 "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
                 "Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
                 "PelvRot:", floatstr(rPelvRot),
+                "RewPos:", floatstr(rRewStatePos),
+                "RewVel:", floatstr(rRewStateVel),
                 )
 
 
         # Reward for not falling
         #reward = 10.0
-        reward = self.rBaseReward
+        reward = self.rBaseReward + rRewStatePos + rRewStateVel
         
         return reward - penalty 
 
