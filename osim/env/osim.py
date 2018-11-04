@@ -693,8 +693,8 @@ class ProstheticsEnv(OsimEnv):
         rLossPos = ankle_loss + knee_loss + hip_loss
         rLossVel = ankle_loss_v + knee_loss_v + hip_loss_v
 
-        rRewStatePos = np.exp(-self.dConfig["rPenStateLoc"] * rLossPos)
-        rRewStateVel = np.exp(-self.dConfig["rPenStateVel"] * rLossVel)
+        rRewStatePos = float(np.exp(-self.dConfig["rPenStateLoc"] * rLossPos))
+        rRewStateVel = float(np.exp(-self.dConfig["rPenStateVel"] * rLossVel))
 
         #print(rRewStatePos, rRewStateVel, type(rRewStatePos), type(rRewStateVel))
 
