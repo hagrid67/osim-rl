@@ -669,7 +669,7 @@ class ProstheticsEnv(OsimEnv):
 
         rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1) # not rPenPower
 
-
+        # lance
         dfKin = self.osim_model.dfKin
         t = self.osim_model.istep
 
@@ -709,45 +709,53 @@ class ProstheticsEnv(OsimEnv):
 
         #rRewStatePos = float(np.exp(-self.dConfig["rPenStateLoc"] * rLossPos))
         #rRewStateVel = float(np.exp(-self.dConfig["rPenStateVel"] * rLossVel))
-        rRewKinPos = float(np.exp(-2 * rLossPos))
-        rRewKinVel = float(np.exp(-0.1 * rLossVel))
+        #rRewKinPos = float(np.exp(-2 * rLossPos))
+        #rRewKinVel = float(np.exp(-0.1 * rLossVel))
 
-        rLossTarVel =   (state_desc["body_vel"]['pelvis'][0] - state_desc["target_vel"][0])**2 + \
-                        (state_desc["body_vel"]['pelvis'][2] - state_desc["target_vel"][2])**2 
-        rRewTarVel = np.exp(-8 * rLossTarVel)
+        # my modication - drop the exponential, just use the loss ie distance^2
+        rPenKinPos = rLossPos
+        rPenKinVel = min(0.1 * rLossVel, 2)
+
+        # lance 
+        #rLossTarVel =   (state_desc["body_vel"]['pelvis'][0] - state_desc["target_vel"][0])**2 + \
+        #                (state_desc["body_vel"]['pelvis'][2] - state_desc["target_vel"][2])**2 
+        #rRewTarVel = np.exp(-8 * rLossTarVel)
 
 
 
         #print(rRewStatePos, rRewStateVel, type(rRewStatePos), type(rRewStateVel))
 
 
-        #penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight
-        penalty = 0
-        
-
-
-        if False: # if self.dConfig["debug"]:
-            print(
-                t,
-                "Pen:", floatstr(penalty),
-                "PenV:", floatstr(rPenVx, rPenVz),
-                "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
-                "Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
-                "PelvRot:", floatstr(rPelvRot),
-                "RewPos:", floatstr(rRewKinPos),
-                "RewVel:", floatstr(rRewKinVel),
-                "lossv:", floatstr(ankle_loss_v, knee_loss_v, hip_loss_v),
-                "v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][t],
-                )
+        penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight + rPenKinPos + rPenKinVel
+        #penalty = 0
 
 
         # Reward for not falling
         #reward = 10.0
         #reward = self.rBaseReward + rRewStatePos + rRewStateVel
-        reward = rkTarVel * rRewTarVel + rkKin * ( rkKinPos * rRewKinPos + rkKinVel * rRewKinVel)
-        
+        #reward = rkTarVel * rRewTarVel + rkKin * ( rkKinPos * rRewKinPos + rkKinVel * rRewKinVel)
+        reward = self.rBaseReward - float(penalty)
+
 
         if self.dConfig["debug"]:
+            print(
+                t,
+                "rew:", floatstr(reward),
+                "Pen:", floatstr(penalty),
+                "PenV:", floatstr(rPenVx, rPenVz),
+                "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
+                #"Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
+                "PelvRot:", floatstr(rPelvRot),
+                "KinPos:", floatstr(rPenKinPos),
+                "KinVel:", floatstr(rPenKinVel),
+                "lossv:", floatstr(ankle_loss_v, knee_loss_v, hip_loss_v),
+                #"v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][t],
+                )
+
+
+        
+
+        if False: # if self.dConfig["debug"]:
             print(
                 t,
                 "Rew:", floatstr(reward),
