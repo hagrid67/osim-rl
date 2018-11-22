@@ -8,7 +8,7 @@ import random
 import pandas as pd
 
 def floatstr(*lrVal):
-    return " ".join(["{:.2f}".format(float(rVal)) for rVal in lrVal])
+    return " ".join(["{:.3f}".format(float(rVal)) for rVal in lrVal])
 
 
 ## OpenSim interface
@@ -670,9 +670,14 @@ class ProstheticsEnv(OsimEnv):
         rPenKneeStraight = self.dConfig["rPenKneeStraight"] * ((rKnee_l + rKnee_r) ** 1) # not rPenPower
 
         # lance
+        # reward = b1 x "standard reward" + b2 x ( c2 x kin vel reward + c3 x kin pos reward),
+        # where c2, c3 = 0.25, 0.75,
+        # when (istep > 20) => b1, b2 = 0.3, 0.7 
+        # when istep < 20   =>          0.9, 0.1 
         dfKin = self.osim_model.dfKin
         t = self.osim_model.istep
 
+        # blending of target velocity and target kinetics
         if t < 20:
             rkTarVel, rkKin = 0.9, 0.1
         else:
@@ -709,40 +714,55 @@ class ProstheticsEnv(OsimEnv):
 
         #rRewStatePos = float(np.exp(-self.dConfig["rPenStateLoc"] * rLossPos))
         #rRewStateVel = float(np.exp(-self.dConfig["rPenStateVel"] * rLossVel))
-        #rRewKinPos = float(np.exp(-2 * rLossPos))
-        #rRewKinVel = float(np.exp(-0.1 * rLossVel))
+        rRewKinPos = float(np.exp(-2 * rLossPos))
+        rRewKinVel = float(np.exp(-0.1 * rLossVel))
 
-        # my modication - drop the exponential, just use the loss ie distance^2
-        rPenKinPos = rLossPos
-        rPenKinVel = min(0.1 * rLossVel, 2)
+        # my modification - drop the exponential, just use the loss ie distance^2
+        #rPenKinPos = rkKinPos * rLossPos
+        #rPenKinVel = rkKinVel * min(0.1 * rLossVel, 2) # cap the vel loss
 
         # lance 
-        #rLossTarVel =   (state_desc["body_vel"]['pelvis'][0] - state_desc["target_vel"][0])**2 + \
-        #                (state_desc["body_vel"]['pelvis'][2] - state_desc["target_vel"][2])**2 
-        #rRewTarVel = np.exp(-8 * rLossTarVel)
+        rLossTarVel =   (state_desc["body_vel"]['pelvis'][0] - state_desc["target_vel"][0])**2 + \
+                        (state_desc["body_vel"]['pelvis'][2] - state_desc["target_vel"][2])**2 
+        rRewTarVel = np.exp(-8 * rLossTarVel)
 
 
 
         #print(rRewStatePos, rRewStateVel, type(rRewStatePos), type(rRewStateVel))
 
 
-        penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight + rPenKinPos + rPenKinVel
+        #penalty += rPenVx + rPenVz + rPenHipAdd + rPenKneeStraight + rPenKinPos + rPenKinVel
         #penalty = 0
 
 
         # Reward for not falling
         #reward = 10.0
         #reward = self.rBaseReward + rRewStatePos + rRewStateVel
-        #reward = rkTarVel * rRewTarVel + rkKin * ( rkKinPos * rRewKinPos + rkKinVel * rRewKinVel)
-        reward = self.rBaseReward - float(penalty)
+        reward = self.rBaseReward + rkTarVel * rRewTarVel + rkKin * ( rkKinPos * rRewKinPos + rkKinVel * rRewKinVel)
+        #reward = self.rBaseReward - float(penalty)
 
 
         if self.dConfig["debug"]:
+            print(os.getpid(), t,
+                floatstr(reward-penalty,
+                reward,
+                penalty, 
+                self.rBaseReward,
+                rkTarVel,
+                rRewTarVel,
+                rkKin,
+                rkKinPos,
+                rRewKinPos,
+                rkKinVel,
+                rRewKinVel,
+                ))
+
+        if False:
             print(
-                t,
+                os.getpid(), t,
                 "rew:", floatstr(reward),
                 "Pen:", floatstr(penalty),
-                "PenV:", floatstr(rPenVx, rPenVz),
+                #"PenV:", floatstr(rPenVx, rPenVz),
                 "PenHip:", floatstr(rPenHipAdd, rHipAdd_l, rHipAdd_r),
                 #"Knee", floatstr(rPenKneeStraight, rKnee_l, rKnee_r),
                 "PelvRot:", floatstr(rPelvRot),
@@ -774,8 +794,8 @@ class ProstheticsEnv(OsimEnv):
                 )
 
 
-        #return reward - penalty 
-        return reward
+        return reward - penalty 
+        #return reward
 
     def reward(self):
         if self.difficulty == 0:
