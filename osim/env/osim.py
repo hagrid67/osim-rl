@@ -311,7 +311,7 @@ class OsimEnv(gym.Env):
         'video.frames_per_second' : None
     }
 
-    def reward(self):
+    def reward(self, gAct):
         raise NotImplementedError
 
     def is_done(self):
@@ -373,7 +373,7 @@ class OsimEnv(gym.Env):
         else:
             obs = self.get_state_desc()
             
-        return [ obs, self.reward(), self.is_done() or (self.osim_model.istep >= self.spec.timestep_limit), {} ]
+        return [ obs, self.reward(action), self.is_done() or (self.osim_model.istep >= self.spec.timestep_limit), {} ]
 
     def render(self, mode='human', close=False):
         return
@@ -622,14 +622,14 @@ class ProstheticsEnv(OsimEnv):
         # pos_reward = np.exp(-2* total_position_loss)
 
 
-    def reward_round1(self):
+    def reward_round1(self, gAct):
         state_desc = self.get_state_desc()
         prev_state_desc = self.get_prev_state_desc()
         if not prev_state_desc:
             return 0
         return 9.0 - (state_desc["body_vel"]["pelvis"][0] - 3.0)**2
 
-    def reward_round2(self):
+    def reward_round2(self, gAct):
         state_desc = self.get_state_desc()
         prev_state_desc = self.get_prev_state_desc()
         penalty = 0
@@ -683,31 +683,36 @@ class ProstheticsEnv(OsimEnv):
         else:
             rkTarVel, rkKin  = 0.3, 0.7
 
+        it = t
+        if it > 1000:
+            rkTarVel, rkKin = 1, 0
+            it = 1000
+
         rkKinVel = 0.25
         rkKinPos = 0.75
 
 
-        ankle_loss = (state_desc['joint_pos']['ankle_l'] - dfKin['ankle_angle_l'][t])**2
+        ankle_loss = (state_desc['joint_pos']['ankle_l'] - dfKin['ankle_angle_l'][it])**2
 
-        knee_loss = (state_desc['joint_pos']['knee_l'] - dfKin['knee_angle_l'][t])**2 + \
-                    (state_desc['joint_pos']['knee_r'] - dfKin['knee_angle_r'][t])**2
+        knee_loss = (state_desc['joint_pos']['knee_l'] - dfKin['knee_angle_l'][it])**2 + \
+                    (state_desc['joint_pos']['knee_r'] - dfKin['knee_angle_r'][it])**2
 
-        hip_loss =  (state_desc['joint_pos']['hip_l'][0] - dfKin['hip_flexion_l'][t])**2 +      \
-                    (state_desc['joint_pos']['hip_r'][0] - dfKin['hip_flexion_r'][t])**2 +      \
-                    (state_desc['joint_pos']['hip_l'][1] - dfKin['hip_adduction_l'][t])**2 +    \
-                    (state_desc['joint_pos']['hip_r'][1] - dfKin['hip_adduction_r'][t])**2
+        hip_loss =  (state_desc['joint_pos']['hip_l'][0] - dfKin['hip_flexion_l'][it])**2 +      \
+                    (state_desc['joint_pos']['hip_r'][0] - dfKin['hip_flexion_r'][it])**2 +      \
+                    (state_desc['joint_pos']['hip_l'][1] - dfKin['hip_adduction_l'][it])**2 +    \
+                    (state_desc['joint_pos']['hip_r'][1] - dfKin['hip_adduction_r'][it])**2
 
 
-        ankle_loss_v = (state_desc['joint_vel']['ankle_l'] - dfKin['ankle_angle_l_speed'][t])**2 
-                    #+ (state_desc['joint_vel']['ankle_r'] - dfKin['ankle_angle_r_speed'][t])**2
+        ankle_loss_v = (state_desc['joint_vel']['ankle_l'] - dfKin['ankle_angle_l_speed'][it])**2 
+                    #+ (state_desc['joint_vel']['ankle_r'] - dfKin['ankle_angle_r_speed'][it])**2
         
-        knee_loss_v = (state_desc['joint_vel']['knee_l'] - dfKin['knee_angle_l_speed'][t])**2 +     \
-                     (state_desc['joint_vel']['knee_r'] - dfKin['knee_angle_r_speed'][t])**2
+        knee_loss_v = (state_desc['joint_vel']['knee_l'] - dfKin['knee_angle_l_speed'][it])**2 +     \
+                     (state_desc['joint_vel']['knee_r'] - dfKin['knee_angle_r_speed'][it])**2
 
-        hip_loss_v = (state_desc['joint_vel']['hip_l'][0] - dfKin['hip_flexion_l_speed'][t])**2 +   \
-                     (state_desc['joint_vel']['hip_r'][0] - dfKin['hip_flexion_r_speed'][t])**2 +   \
-                     (state_desc['joint_vel']['hip_l'][1] - dfKin['hip_adduction_l_speed'][t])**2 + \
-                     (state_desc['joint_vel']['hip_r'][1] - dfKin['hip_adduction_r_speed'][t])**2
+        hip_loss_v = (state_desc['joint_vel']['hip_l'][0] - dfKin['hip_flexion_l_speed'][it])**2 +   \
+                     (state_desc['joint_vel']['hip_r'][0] - dfKin['hip_flexion_r_speed'][it])**2 +   \
+                     (state_desc['joint_vel']['hip_l'][1] - dfKin['hip_adduction_l_speed'][it])**2 + \
+                     (state_desc['joint_vel']['hip_r'][1] - dfKin['hip_adduction_r_speed'][it])**2
 
         rLossPos = ankle_loss + knee_loss + hip_loss
         rLossVel = ankle_loss_v + knee_loss_v + hip_loss_v
@@ -755,7 +760,9 @@ class ProstheticsEnv(OsimEnv):
                 rRewKinPos,
                 rkKinVel,
                 rRewKinVel,
-                ))
+                ),
+                " ".join( [ str(oAct[0]) for oAct in gAct ] ),
+                )
 
         if False:
             print(
@@ -769,7 +776,7 @@ class ProstheticsEnv(OsimEnv):
                 "KinPos:", floatstr(rPenKinPos),
                 "KinVel:", floatstr(rPenKinVel),
                 "lossv:", floatstr(ankle_loss_v, knee_loss_v, hip_loss_v),
-                #"v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][t],
+                #"v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][it],
                 )
 
 
@@ -790,17 +797,17 @@ class ProstheticsEnv(OsimEnv):
                 #"RewPos:", floatstr(rRewStatePos),
                 #"RewVel:", floatstr(rRewStateVel),
                 "lossv:", floatstr(ankle_loss_v, knee_loss_v, hip_loss_v),
-                "v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][t],
+                "v", state_desc['joint_vel']['ankle_l'], dfKin['ankle_angle_l_speed'][it],
                 )
 
 
         return reward - penalty 
         #return reward
 
-    def reward(self):
+    def reward(self, gAct):
         if self.difficulty == 0:
-            return self.reward_round1()
-        return self.reward_round2()
+            return self.reward_round1(gAct)
+        return self.reward_round2(gAct)
 
 
 class Arm2DEnv(OsimEnv):
