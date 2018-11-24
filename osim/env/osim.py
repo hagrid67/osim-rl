@@ -761,7 +761,8 @@ class ProstheticsEnv(OsimEnv):
                 rkKinVel,
                 rRewKinVel,
                 ),
-                " ".join( [ str(oAct[0]) for oAct in gAct ] ),
+                #" ".join( [ str(oAct[0]) for oAct in gAct ] ),
+                floatstr(*gAct),
                 )
 
         if False:
