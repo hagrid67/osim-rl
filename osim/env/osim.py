@@ -245,7 +245,7 @@ class OsimModel(object):
 
         self.istep = self.start_point =  0
 
-        np.random.seed(None) 
+        #np.random.seed(None) 
         self.istep = self.start_point =  np.random.randint(-33,100)#10/11 for jrf plots, 50/51 for video
         if self.istep < 20:
             self.istep = self.start_point = 0
@@ -448,9 +448,9 @@ class ProstheticsEnv(OsimEnv):
 
     def __init__(self,
             visualize = True, 
-            integrator_accuracy = 5e-5,
+            #integrator_accuracy = 5e-5,
             difficulty=0,
-            seed=0,
+            seed=None,
             dEnvConfig={},
             ):
 
@@ -468,6 +468,7 @@ class ProstheticsEnv(OsimEnv):
             timestep_limit = 1000,
             debug = False,
             sfOsim = None,
+            integrator_accuracy = 0.001,
             
 
             )
@@ -490,7 +491,10 @@ class ProstheticsEnv(OsimEnv):
         else:
             self.model_path = self.model_paths[self.get_model_key()]
 
-        super(ProstheticsEnv, self).__init__(visualize = visualize, integrator_accuracy = integrator_accuracy)
+        #super(ProstheticsEnv, self).__init__(
+        super().__init__(
+            visualize = visualize,
+            integrator_accuracy = self.dConfig["integrator_accuracy"])
         
         self.set_difficulty(difficulty)
         
